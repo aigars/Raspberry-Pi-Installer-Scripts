@@ -2,113 +2,36 @@
 
 [Product learn page on Adafruit](https://learn.adafruit.com/adafruit-i2s-mems-microphone-breakout/overview).
 
-Known problems with this driver: Low vol level. While you can use the alsa magic socery to make an alsa softvol input, that approach won't work out of the box with anything that uses Pulseaudio. If you have any idea how to make this work with Pulse, please drop me a line.
+This repository has small changes to the original snd-i2smic-rpi driver from [Raspberry Pi install scripts](https://github.com/adafruit/Raspberry-Pi-Installer-Scripts) that allows Raspberry Pi to receive I2S BCK and LRCK from I2S source. That is necessarry to connect Ian Canada Reciever Pi card to Raspberry Pi 4B or any other I2S source that runs with its own BCK and LRCK.
 
-Installing the I2S microphone driver the easy way
-====================================
+[Ian Canada Receiver Pi manual](https://github.com/iancanada/DocumentDownload/blob/master/ReceiverPi/ReceiverPi/ReceiverPiUsersManual.pdf)
 
-If you use Raspbian or any Debian-derived distribution, [go to the releases tab](https://github.com/htruong/snd-i2s_rpi/releases) and download the newest deb version.
-
-Then do the following
-
-```bash
-
-# Installing raspberrypi-kernel-headers works only if you haven't messed with
-# the rpi-update thing.
-# If you did, then you would have to do the rpi-source method
-# to get the kernel headers. See: 
-# https://learn.adafruit.com/adafruit-i2s-mems-microphone-breakout/raspberry-pi-wiring-and-test#kernel-compiling
-
-$ sudo apt install dkms raspberrypi-kernel-headers
-
-$ sudo dpkg -i snd-i2s-rpi-dkms_0.0.2_all.deb
-
-# For this to work, remember to modify these first:
-# /boot/config.txt -> dtparam=i2s=on
-# and 
-# /etc/modules -> snd-bcm2835
-# remember to reboot
-
-$ sudo modprobe snd-i2s_rpi rpi_platform_generation=0
-
-# rpi_platform_generation=0 for Raspberry Pi 1 B/A/A+, 0
-# do not add anything for everything else (2/3).
-
-# see if it works
-
-$ dmesg | grep i2s
-
-# it should say blah.i2s mapping OK
-
-# [    3.519017] snd_i2s_rpi: loading out-of-tree module taints kernel.
-# [    3.519881] snd-i2s_rpi: Version 0.0.2
-# [    3.519889] snd-i2s_rpi: Setting platform to 20203000.i2s
-# [    7.624559] asoc-simple-card asoc-simple-card.0: ASoC: CPU DAI 20203000.i2s not registered - will retry
-#  ... snip ...
-# [    9.507142] asoc-simple-card asoc-simple-card.0: snd-soc-dummy-dai <-> 20203000.i2s mapping ok
-
-$ arecord -l
-
-# it should list your mic
-# note that the default vol level is very low, you need
-# to follow the ladyada's guide to make it hearable
-
-
-# If you want it to load automatically at startup
-
-# 1. Add to /etc/modules
-# snd-i2s_rpi
-
-# 2. If you have a Pi old-gen, you need to do this:
-# create file called /etc/modprobe.d/snd-i2s_rpi.conf
-# add this line
-# options snd-i2s_rpi rpi_platform_generation=0
-
-```
-
+This is example connection:
+![Raspberry Pi 4B with Ian Canada Receiver Pi](https://github.com/aigars/Raspberry-Pi-Installer-Scripts/blob/main/i2s_mic_module/connection.jpg?raw=true)
 
 Installing as a stand-alone module
 ====================================
 
-    make
-    sudo make install
+```bash
+# Get needed packages
+apt-get -y install git raspberrypi-kernel-headers
 
-To load the driver manually, run this as root:
+# Clone the repo
+git clone https://github.com/aigars/Raspberry-Pi-Installer-Scripts.git
 
-    modprobe snd-i2s_rpi
+# Build and install the module
+cd Raspberry-Pi-Installer-Scripts/i2s_mic_module
+make clean
+make
+make install
 
-You may also specify custom toolchains by using the `CROSS_COMPILE` flag:
+# Setup auto load at boot
+echo "snd-i2smic-rpi" > /etc/modules-load.d/snd-i2smic-rpi.conf
+echo "options snd-i2smic-rpi rpi_platform_generation=2" > /etc/modprobe.d/snd-i2smic-rpi.conf
 
-    CROSS_COMPILE=/usr/local/bin/arm-eabi-
+# Enable I2S overlay
+sed -i -e 's/#dtparam=i2s/dtparam=i2s/g' /boot/config.txt
 
-
-Installing as a part of the kernel
-======================================
-
-Instructions to come later. Who would ever want to do that?
-
-
-
-
-Installing as a DKMS module
-=================================
-
-You can have even more fun with snd-i2s\_rpi by installing it as a DKMS module has the main advantage of being auto-compiled (and thus, possibly surviving) between kernel upgrades.
-
-First, get dkms. On Raspbian this should be:
-
-	sudo apt install dkms
-
-Then copy the root of this repository to `/usr/share`:
-
-	sudo cp -R . /usr/src/snd-i2s_rpi-0.0.2 (or whatever version number declared on dkms.conf is)
-	sudo dkms add -m snd-i2s_rpi -v 0.0.2
-
-Build and load the module:
-
-	sudo dkms build -m snd-i2s_rpi -v 0.0.2
-	sudo dkms install -m snd-i2s_rpi -v 0.0.2
-
-Now you have a proper dkms module that will work for a long time... hopefully.
-
-
+# Reboot after installing and verify with
+arecord -l
+```
